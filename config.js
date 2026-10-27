@@ -6,6 +6,10 @@ window.MAP_CONFIG = {
   // 店舗一覧のシート（タブ）名
   SHEET_NAME: '店舗',
 
+  // Google Maps のAPIキー（場所検索の精度アップ用・任意）
+  // 必ず「HTTPリファラー：yukio0302.github.io/*」で制限した新しいキーを使ってください
+  GOOGLE_MAPS_KEY: '',
+
   // Googleアナリティクス4 の測定ID（例：G-XXXXXXXXXX）。空なら計測しません
   GA_ID: '',
 

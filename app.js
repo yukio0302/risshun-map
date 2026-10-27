@@ -21,12 +21,32 @@
   const isMobile = () => window.matchMedia('(max-width: 820px)').matches;
 
   // ===== 地図 =====
-  const map = L.map('map', { zoomControl: false, preferCanvas: true }).setView(JAPAN_CENTER, 5);
+  const map = L.map('map', { zoomControl: false, preferCanvas: true, minZoom: 4, maxZoom: 19 }).setView(JAPAN_CENTER, 5);
   L.control.zoom({ position: 'topright' }).addTo(map);
-  L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
-    maxZoom: 18,
-    attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a>',
-  }).addTo(map);
+  // 背景地図：OpenFreeMap（Google風・無料）→ 使えない環境では国土地理院の淡色地図
+  function addGsiLayer() {
+    L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">国土地理院</a>',
+    }).addTo(map);
+  }
+  async function addBaseMap() {
+    try {
+      if (!window.maplibregl || !L.maplibreGL || !maplibregl.supported || !maplibregl.supported()) throw new Error('no webgl');
+      const style = await (await fetch('https://tiles.openfreemap.org/styles/liberty')).json();
+      style.layers.forEach((l) => {
+        // 地名・駅名などを日本語で表示
+        if (l.layout && l.layout['text-field']) l.layout['text-field'] = ['coalesce', ['get', 'name:ja'], ['get', 'name']];
+      });
+      L.maplibreGL({
+        style,
+        attribution: '<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+      }).addTo(map);
+    } catch (e) {
+      addGsiLayer();
+    }
+  }
+  addBaseMap();
 
   const allLayer = L.layerGroup().addTo(map);   // 全国の店舗（小さい点）
   const resultLayer = L.layerGroup().addTo(map);
@@ -146,7 +166,43 @@
   }
 
   // ===== 位置の検索（ジオコーディング） =====
+  // Google のジオコーダー（config.js に GOOGLE_MAPS_KEY があるときだけ）
+  let gmapsReady = null;
+  function loadGoogle() {
+    if (!CFG.GOOGLE_MAPS_KEY) return Promise.resolve(false);
+    if (!gmapsReady) {
+      gmapsReady = new Promise((resolve) => {
+        window.__gmapsLoaded = () => resolve(true);
+        const sc = document.createElement('script');
+        sc.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(CFG.GOOGLE_MAPS_KEY)}&language=ja&region=JP&loading=async&callback=__gmapsLoaded`;
+        sc.async = true;
+        sc.onerror = () => resolve(false);
+        document.head.appendChild(sc);
+        setTimeout(() => resolve(false), 8000);
+      });
+    }
+    return gmapsReady;
+  }
+  async function geocodeGoogle(query) {
+    if (!(await loadGoogle()) || !window.google || !google.maps || !google.maps.Geocoder) return [];
+    const gc = new google.maps.Geocoder();
+    try {
+      const { results } = await gc.geocode({ address: query, region: 'jp', componentRestrictions: { country: 'JP' } });
+      const uniq = [];
+      (results || []).slice(0, 5).forEach((r) => {
+        const p = [r.geometry.location.lat(), r.geometry.location.lng()];
+        if (!uniq.some((u) => distanceKm(u.pos, p) < 3)) {
+          uniq.push({ pos: p, label: r.formatted_address.replace(/^日本、(〒\d{3}-\d{4} )?/, '') });
+        }
+      });
+      return uniq;
+    } catch (e) { return []; }
+  }
+
   async function geocode(query) {
+    // 0) Google（キーがあるとき）
+    const g = await geocodeGoogle(query);
+    if (g.length) return g;
     // 1) OpenStreetMap（駅名・施設名に強い）
     try {
       const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=jp&accept-language=ja&limit=5&q=${encodeURIComponent(query)}`;
