@@ -32,7 +32,7 @@
   }
   async function addBaseMap() {
     try {
-      if (!window.maplibregl || !L.maplibreGL || !maplibregl.supported || !maplibregl.supported()) throw new Error('no webgl');
+      if (!window.maplibregl || !L.maplibreGL || !document.createElement('canvas').getContext('webgl')) throw new Error('no webgl');
       const style = await (await fetch('https://tiles.openfreemap.org/styles/liberty')).json();
       style.layers.forEach((l) => {
         // 地名・駅名などを日本語で表示
