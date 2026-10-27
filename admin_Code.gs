@@ -45,7 +45,7 @@ function setupAndImport() {
   }
   const data = JSON.parse(res.getContentText());
   const rows = data.map(function (s) {
-    return [s.u, '○', s.n, s.b.join('、'), s.a || '', s.la, s.lo, '', ''];
+    return [s.u, '○', s.n, s.b.join('、'), s.a || '', s.la, s.lo, s.url || '', ''];
   });
   sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
   sh.getRange(2, 1, rows.length, HEADERS.length).setValues(rows);
