@@ -2,7 +2,7 @@
 window.MAP_CONFIG = {
   // 管理用スプレッドシートのID（URLの /d/ と /edit の間の文字列）
   // 空のときは同じフォルダの stores.json を使います
-  SHEET_ID: '1WV1anO6dmrOyg1wtzU-uoVtW2i-bbnvBp3xGBHh3R80',
+  SHEET_ID: '1lDW-f5_or3hPbvZYTvg4LLZd0zTfhcpsBtB8I9UArIA',
   // 店舗一覧のシート（タブ）名
   SHEET_NAME: '店舗',
 
