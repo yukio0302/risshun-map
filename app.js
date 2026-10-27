@@ -491,7 +491,11 @@
   els.q.addEventListener('focus', () => { if (isMobile()) setSheet('open'); });
 
   // ===== 起動 =====
-  setSheet(isMobile() ? 'open' : 'open');
+  // 最初の表示：スマホはパネル半分、地図は日本全体が見える位置
+  setSheet(isMobile() ? 'half' : 'open');
+  map.fitBounds([[24.0, 123.0], [45.6, 146.0]], isMobile()
+    ? { paddingTopLeft: [10, 10], paddingBottomRight: [10, Math.round(window.innerHeight * 0.46)] }
+    : { paddingTopLeft: [450, 20], paddingBottomRight: [20, 20] });
   loadStores().then((data) => {
     stores = data;
     // 全国の店舗を薄い点で表示
