@@ -297,7 +297,7 @@
     try {
       const res = await fetch(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(query)}`);
       if (!res.ok) return [];
-      return (await res.json()).slice(0, 10).map((d) => {
+      return (await res.json()).slice(0, 30).map((d) => {
         const title = d.properties.title || '';
         const isAddr = /^(北海道|東京都|京都府|大阪府|.{2,3}県)/.test(title);
         return { pos: [d.geometry.coordinates[1], d.geometry.coordinates[0]], name: title, area: isAddr ? title : '', gsiPlace: !isAddr };
@@ -324,12 +324,13 @@
     let list = [...osm, ...gsi, ...gsiName];
 
     // 地理院の施設名には住所が付かないので、近くの市区町村名を補う
-    await Promise.all(list.filter((c) => c.gsiPlace).slice(0, 8).map(async (c) => { c.area = await gsiArea(c.pos); }));
+    await Promise.all(list.filter((c) => c.gsiPlace).slice(0, 20).map(async (c) => { c.area = await gsiArea(c.pos); }));
 
     // 2) 入力した名前を含むものを優先（「鹿本小学校」で「松本小学校」などを出さない）
     const key = norm(name);
     const hit = list.filter((c) => key && norm(c.name).includes(key));
-    if (hit.length) list = hit;
+    const exact = hit.filter((c) => norm(c.name) === key);
+    if (hit.length) list = exact.length ? exact : hit;
     // 3) 地域（「江戸川区」など）を入れていたら、その地域のものを優先
     if (area.length) {
       const inArea = list.filter((c) => area.every((t) => (c.area + c.name).includes(t.replace(/[\s　]/g, ''))));
@@ -346,7 +347,7 @@
       if (uniq.some((u) => distanceKm(u.pos, c.pos) < 0.5)) continue;
       const areaText = c.area && c.area !== c.name ? c.area : '';
       uniq.push({ pos: c.pos, label: c.name, title: c.name, sub: areaText });
-      if (uniq.length >= 6) break;
+      if (uniq.length >= 8) break;
     }
     if (uniq.length) return uniq;
 
