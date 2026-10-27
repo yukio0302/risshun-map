@@ -48,6 +48,7 @@
   }
   addBaseMap();
 
+  map.createPane('originPane').style.zIndex = 650; // お店のピン(600)より上、吹き出し(700)より下
   const allLayer = L.layerGroup().addTo(map);   // 全国の店舗（小さい点）
   const resultLayer = L.layerGroup().addTo(map);
   let hereMarker = null;
@@ -66,8 +67,8 @@
     return 2 * R * Math.asin(Math.sqrt(h));
   }
   const fmtDist = (km) => (km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`);
-  function label(i) { // A〜Z、それ以降は数字
-    return i < 26 ? String.fromCharCode(65 + i) : String(i + 1);
+  function label(i) { // 近い順に 1, 2, 3 …
+    return String(i + 1);
   }
   const detailUrl = (s) => s.url || `https://www.meimonshu.jp/modules/sakeshops/index.php?page=shop_detail&sid=${s.u}`;
 
@@ -146,7 +147,7 @@
   const routeUrl = (s) => `https://www.google.com/maps/dir/?api=1&destination=${s.la},${s.lo}`;
 
   function pinIcon(text, active) {
-    const small = text.length > 1 ? ' small' : '';
+    const small = text.length > 2 ? ' small' : '';
     return L.divIcon({
       className: '',
       html: `<div class="pin${small}${active ? ' active' : ''}"><svg viewBox="0 0 30 40" width="30" height="40"><path d="M15 0C6.7 0 0 6.5 0 14.6 0 25.5 15 40 15 40s15-14.5 15-25.4C30 6.5 23.3 0 15 0z" fill="#c8161d"/></svg><span>${text}</span></div>`,
@@ -345,8 +346,17 @@
     history.replaceState(null, '', `${location.pathname}${params.toString() ? '?' + params : ''}`);
 
     if (hereMarker) hereMarker.remove();
-    hereMarker = L.marker(pos, { icon: L.divIcon({ className: '', html: '<div class="here-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }), zIndexOffset: -100 })
-      .bindTooltip(esc(labelText), { direction: 'top', offset: [0, -10] }).addTo(map);
+    // 検索地点：お店のピンより必ず手前に表示
+    hereMarker = L.marker(pos, {
+      pane: 'originPane',
+      interactive: false,
+      keyboard: false,
+      icon: L.divIcon({
+        className: '',
+        html: `<div class="origin-mark"><span class="origin-pulse"></span><span class="origin-dot"></span><span class="origin-label">${esc(labelText)}</span></div>`,
+        iconSize: [0, 0], iconAnchor: [0, 0],
+      }),
+    }).addTo(map);
 
     els.intro.hidden = true;
     els.examples.hidden = true;

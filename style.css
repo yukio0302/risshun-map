@@ -112,7 +112,13 @@ a{color:inherit}
 .pin.small span{font-size:10px}
 .pin.active{transform:scale(1.25);transform-origin:50% 100%;z-index:1000!important}
 .pin.active svg path{fill:#1f1f1f}
-.here-dot{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 6px rgba(26,115,232,.25)}
+.origin-mark{position:relative;width:0;height:0;pointer-events:none}
+.origin-dot{position:absolute;left:-12px;top:-12px;width:24px;height:24px;border-radius:50%;background:#1a73e8;border:4px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.origin-pulse{position:absolute;left:-28px;top:-28px;width:56px;height:56px;border-radius:50%;background:rgba(26,115,232,.28);animation:origin-pulse 1.8s ease-out infinite}
+.origin-label{position:absolute;left:0;bottom:20px;transform:translateX(-50%);white-space:nowrap;background:#1a73e8;color:#fff;font:700 13px/1 "Noto Sans JP",sans-serif;padding:7px 11px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.origin-label::after{content:"";position:absolute;left:50%;bottom:-5px;margin-left:-5px;border-style:solid;border-width:6px 5px 0 5px;border-color:#1a73e8 transparent transparent transparent}
+@keyframes origin-pulse{0%{transform:scale(.4);opacity:1}100%{transform:scale(1.4);opacity:0}}
+@media (prefers-reduced-motion: reduce){.origin-pulse{animation:none;opacity:.6}}
 .leaflet-popup-content{font-family:inherit;margin:12px 14px}
 .popup-name{font-weight:700;font-size:14px;margin-bottom:4px}
 .popup-dist{font-size:12px;color:var(--muted)}
