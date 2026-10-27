@@ -259,7 +259,7 @@
     return { area, name };
   }
   // 「江戸川区立 鹿本小学校」→「鹿本小学校」のように比べやすくする
-  const norm = (t) => String(t || '').replace(/[\s　]+/g, '').replace(/^(.+?[都道府県市区町村]|国|私)立(?=.{2,})/, '').replace(/ヶ|ケ/g, 'が');
+  const norm = (t) => String(t || '').replace(/[\s　]+/g, '').replace(/^(.*?[都道府県市区町村]|国|私)立(?=.{2,})/, '').replace(/ヶ|ケ/g, 'が');
 
   let muniTable = null;
   async function muniName(code) {
