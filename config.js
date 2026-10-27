@@ -11,7 +11,7 @@ window.MAP_CONFIG = {
   GOOGLE_MAPS_KEY: '',
 
   // Googleアナリティクス4 の測定ID（例：G-XXXXXXXXXX）。空なら計測しません
-  GA_ID: '',
+  GA_ID: 'G-YKENDDX6KE',
 
   // 検索範囲（km）
   RADIUS_KM: 10,
