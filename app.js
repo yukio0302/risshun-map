@@ -70,7 +70,7 @@
   function label(i) { // 近い順に 1, 2, 3 …
     return String(i + 1);
   }
-  const detailUrl = (s) => s.url || `https://www.meimonshu.jp/modules/sakeshops/index.php?page=shop_detail&sid=${s.u}`;
+  const detailUrl = (s) => s.url || `https://www.meimonshu.jp/xp_shop/?sid=${s.u}`;
 
   // ===== アクセス解析（GA4） =====
   function track(name, params) {
@@ -114,7 +114,7 @@
     const head = rows.shift().map((h) => h.trim());
     const col = (name) => head.indexOf(name);
     const iId = col('店舗ID'), iShow = col('表示'), iName = col('店名'), iBrand = col('銘柄'),
-          iLat = col('緯度'), iLon = col('経度'), iUrl = col('詳細URL');
+          iLat = col('緯度'), iLon = col('経度'), iUrl = col('詳細URL'), iAddr = col('住所');
     if (iName < 0 || iLat < 0 || iLon < 0 || iBrand < 0) throw new Error('sheet columns');
     const out = [];
     rows.forEach((r, i) => {
@@ -127,7 +127,7 @@
       const brands = (r[iBrand] || '').split(/[、,，\/／・\s]+/).map((b) => b.trim()).filter(Boolean);
       if (!brands.length) return;
       const id = (iId >= 0 && (r[iId] || '').trim()) || `row${i + 2}`;
-      const s = { n: name, la, lo, u: id, b: brands };
+      const s = { n: name, la, lo, u: id, b: brands, a: iAddr >= 0 ? (r[iAddr] || '').trim() : '' };
       const u = iUrl >= 0 ? (r[iUrl] || '').trim() : '';
       if (/^https?:\/\//.test(u)) s.url = u;
       else if (!/^\d+$/.test(id)) s.url = '';
@@ -389,7 +389,7 @@
       const lb = label(i);
       s._label = lb;
       const m = L.marker([s.la, s.lo], { icon: pinIcon(lb, false), zIndexOffset: 1000 - i, riseOnHover: true })
-        .bindPopup(`<div class="popup-name">${esc(s.n)}</div><div class="popup-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>${detailUrl(s) ? `<a class="popup-link" href="${detailUrl(s)}" target="_blank" rel="noopener">お店の詳細を見る →</a>` : ''}`)
+        .bindPopup(`<div class="popup-name">${esc(s.n)}</div>${s.a ? `<div class="popup-addr">${esc(s.a)}</div>` : ''}<div class="popup-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>${detailUrl(s) ? `<a class="popup-link" href="${detailUrl(s)}" target="_blank" rel="noopener">お店の詳細を見る →</a>` : ''}`)
         .on('click', () => activate(s.u, { from: 'map' }))
         .addTo(resultLayer);
       markers.set(s.u, m);
@@ -400,6 +400,7 @@
         <span class="pin-badge">${s._label}</span>
         <div class="store-body">
           <p class="store-name">${esc(s.n)}</p>
+          ${s.a ? `<div class="store-addr">${esc(s.a)}</div>` : ''}
           <div class="store-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>
           <div class="tags">${s.b.map((b) => `<span class="tag">${esc(b)}</span>`).join('')}</div>
           <div class="store-actions">
