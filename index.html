@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>立春朝搾り 取扱店マップ｜日本名門酒会</title>
+<meta name="description" content="立春朝搾りを取り扱う日本名門酒会加盟店を、駅名や地名・現在地から地図で探せます。">
+<meta property="og:title" content="立春朝搾り 取扱店マップ｜日本名門酒会">
+<meta property="og:description" content="あなたの身近な場所にも「立春朝搾り」との出会いがきっとある。">
+<meta property="og:image" content="banner.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="https://www.meimonshu.jp/" target="_blank" rel="noopener">
+    <span class="brand-mark" aria-hidden="true">名</span>
+    <span class="brand-text"><small>日本名門酒会</small>立春朝搾り 取扱店マップ</span>
+  </a>
+  <a class="topbar-link" href="https://www.meimonshu.jp/modules/xfsection/article.php?articleid=377" target="_blank" rel="noopener">立春朝搾りとは</a>
+</header>
+
+<main class="layout">
+  <div id="map" class="map" aria-label="取扱店の地図"></div>
+
+  <button id="locateFab" class="fab" type="button" title="現在地を表示" aria-label="現在地を表示">
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+  </button>
+
+  <aside id="panel" class="panel" data-state="open">
+    <button id="sheetHandle" class="sheet-handle" type="button" aria-label="パネルを開閉">
+      <span class="grip"></span>
+      <span id="sheetSummary" class="sheet-summary">お店を探す</span>
+    </button>
+
+    <div class="panel-scroll" id="panelScroll">
+      <!-- イントロ（検索前だけ表示） -->
+      <section id="intro" class="intro">
+        <img src="banner.jpg" alt="立春朝搾り 令和八年二月四日 出荷" class="intro-banner" width="900" height="468">
+        <p class="intro-lead">あなたの身近な場所にも<br>「立春朝搾り」との出会いがきっとある。</p>
+        <a class="video-card" href="https://www.youtube.com/watch?v=svSkE9pK3_E" target="_blank" rel="noopener">
+          <span class="video-thumb"><img src="https://i.ytimg.com/vi/svSkE9pK3_E/mqdefault.jpg" alt="" loading="lazy"><span class="play" aria-hidden="true">▶</span></span>
+          <span class="video-text"><b>“異常”なまでに新鮮な日本酒！</b>人と人とを繋ぐ立春朝搾りを動画でご紹介</span>
+        </a>
+      </section>
+
+      <!-- STEP 1 -->
+      <section class="step">
+        <div class="step-head">
+          <h2><span class="step-no">STEP 1</span>場所を探す</h2>
+          <button id="locateBtn" class="chip-btn" type="button">
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            現在地から探す
+          </button>
+        </div>
+        <form id="searchForm" class="search" role="search" autocomplete="off">
+          <input id="q" type="search" placeholder="駅名・地名・住所を入力（例：新宿駅）" enterkeyhint="search" aria-label="駅名・地名・住所">
+          <button type="submit" aria-label="検索">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.5 15.5 21 21" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </button>
+        </form>
+        <div id="examples" class="examples">
+          <span>例：</span>
+          <button type="button" data-q="新宿駅">新宿駅</button>
+          <button type="button" data-q="大阪駅">大阪駅</button>
+          <button type="button" data-q="名古屋駅">名古屋駅</button>
+          <button type="button" data-q="札幌駅">札幌駅</button>
+          <button type="button" data-q="博多駅">博多駅</button>
+        </div>
+        <div id="candidates" class="candidates" hidden></div>
+        <p id="message" class="message" hidden></p>
+      </section>
+
+      <!-- STEP 2 -->
+      <section id="step2" class="step" hidden>
+        <div class="step-head">
+          <h2><span class="step-no">STEP 2</span>銘柄でしぼる</h2>
+        </div>
+        <div id="brandChips" class="brand-chips"></div>
+      </section>
+
+      <!-- STEP 3 -->
+      <section id="step3" class="step" hidden>
+        <div class="step-head">
+          <h2><span class="step-no">STEP 3</span>近くのお店</h2>
+          <span id="resultMeta" class="result-meta"></span>
+        </div>
+        <ol id="storeList" class="store-list"></ol>
+      </section>
+
+      <section class="notes">
+        <h3>ご留意事項</h3>
+        <ul>
+          <li class="warn">ご予約の要否や取り扱い状況は、各店へ直接お問い合わせください。</li>
+          <li>検索結果は在庫を保証するものではありません。</li>
+          <li>店舗の位置は目安です。お出かけ前に詳細ページでご確認ください。</li>
+        </ul>
+        <a class="official-link" href="https://www.meimonshu.jp/modules/xfsection/article.php?articleid=377" target="_blank" rel="noopener">立春朝搾りとは？ 公式サイトはこちら →</a>
+      </section>
+    </div>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
