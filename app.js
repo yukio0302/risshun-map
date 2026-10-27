@@ -87,6 +87,23 @@
     window.gtag('config', CFG.GA_ID);
   }
 
+  // ===== 検索地点の市区町村（集計用） =====
+  const PREFS = ['北海道','青森県','岩手県','宮城県','秋田県','山形県','福島県','茨城県','栃木県','群馬県','埼玉県','千葉県','東京都','神奈川県','新潟県','富山県','石川県','福井県','山梨県','長野県','岐阜県','静岡県','愛知県','三重県','滋賀県','京都府','大阪府','兵庫県','奈良県','和歌山県','鳥取県','島根県','岡山県','広島県','山口県','徳島県','香川県','愛媛県','高知県','福岡県','佐賀県','長崎県','熊本県','大分県','宮崎県','鹿児島県','沖縄県'];
+  async function cityOf(pos) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 4000);
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&accept-language=ja&lat=${pos[0]}&lon=${pos[1]}`;
+      const d = await (await fetch(url, { signal: ctrl.signal })).json();
+      clearTimeout(timer);
+      const a = d.address || {};
+      const code = parseInt(String(a['ISO3166-2-lvl4'] || '').replace('JP-', ''), 10);
+      const pref = a.province || a.state || (code >= 1 && code <= 47 ? PREFS[code - 1] : '');
+      const city = a.city || a.town || a.village || a.county || '';
+      return (pref + city) || null;
+    } catch (e) { return null; }
+  }
+
   // ===== 店舗データの読み込み =====
   // 1) 管理用スプレッドシート → 2) 失敗したら stores.json
   function parseCSV(text) {
@@ -334,11 +351,13 @@
     }
     state.nearby = nearby;
     showMessage(note, 'info');
-    track(labelText === '現在地' ? 'search_location' : 'search', {
+    const evName = labelText === '現在地' ? 'search_location' : 'search';
+    const evParams = {
       search_term: labelText === '現在地' ? '(現在地)' : (els.q.value || labelText),
       result_count: nearby.length,
       nearest_km: nearby.length ? Math.round(nearby[0].d * 10) / 10 : null,
-    });
+    };
+    cityOf(pos).then((city) => track(evName, { ...evParams, search_city: city || '(不明)' }));
 
     // URL に反映（共有・再読み込み用）
     const params = new URLSearchParams(location.search);
@@ -390,7 +409,7 @@
       s._label = lb;
       const m = L.marker([s.la, s.lo], { icon: pinIcon(lb, false), zIndexOffset: 1000 - i, riseOnHover: true })
         .bindPopup(`<div class="popup-name">${esc(s.n)}</div>${s.a ? `<div class="popup-addr">${esc(s.a)}</div>` : ''}<div class="popup-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>${detailUrl(s) ? `<a class="popup-link" href="${detailUrl(s)}" target="_blank" rel="noopener">お店の詳細を見る →</a>` : ''}`)
-        .on('click', () => activate(s.u, { from: 'map' }))
+        .on('click', () => { activate(s.u, { from: 'map' }); track('select_store', { store_name: s.n, store_id: s.u, via: 'map' }); })
         .addTo(resultLayer);
       markers.set(s.u, m);
     });
