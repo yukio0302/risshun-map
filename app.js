@@ -242,6 +242,69 @@
     } catch (e) { return []; }
   }
 
+  // ---- 場所検索（OpenStreetMap と 国土地理院 を合わせて、名前が合うものを優先） ----
+  const AREA_RE = /^(.*?[都道府県])?(.*?[市区町村](?=.))?(.*)$/;
+  function splitQuery(query) {
+    const toks = query.trim().split(/[\s　]+/).filter(Boolean);
+    let area = [], name = '';
+    if (toks.length > 1) {
+      name = toks[toks.length - 1];
+      area = toks.slice(0, -1);
+    } else {
+      const m = (toks[0] || '').match(AREA_RE) || [];
+      area = [m[1], m[2]].filter(Boolean);
+      name = m[3] || toks[0] || '';
+      if (!name) { name = toks[0] || ''; area = []; }
+    }
+    return { area, name };
+  }
+  // 「江戸川区立 鹿本小学校」→「鹿本小学校」のように比べやすくする
+  const norm = (t) => String(t || '').replace(/[\s　]+/g, '').replace(/^(.+?[都道府県市区町村]|国|私)立(?=.{2,})/, '').replace(/ヶ|ケ/g, 'が');
+
+  let muniTable = null;
+  async function muniName(code) {
+    if (!muniTable) {
+      muniTable = fetch('https://maps.gsi.go.jp/js/muni.js').then((r) => r.text()).then((t) => {
+        const map = {};
+        t.replace(/MUNI_ARRAY\["(\d+)"\]\s*=\s*'([^']*)'/g, (_, k, v) => { const p = v.split(','); map[k] = (p[1] || '') + (p[3] || '').replace(/[\s　]+/g, ''); });
+        return map;
+      }).catch(() => ({}));
+    }
+    const t = await muniTable;
+    return t[String(parseInt(code, 10))] || '';
+  }
+  async function gsiArea(pos) {
+    try {
+      const r = await fetch(`https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat=${pos[0]}&lon=${pos[1]}`);
+      const j = await r.json();
+      return j.results ? (await muniName(j.results.muniCd)) + (j.results.lv01Nm && j.results.lv01Nm !== '－' ? j.results.lv01Nm : '') : '';
+    } catch (e) { return ''; }
+  }
+  async function searchNominatim(query) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=jp&accept-language=ja&limit=10&q=${encodeURIComponent(query)}`;
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) return [];
+      return (await res.json()).map((d) => {
+        const a = d.address || {};
+        const area = [a.province || a.state, a.city || a.town || a.village || a.county, a.suburb || a.quarter].filter(Boolean).join('');
+        const name = d.name || (d.display_name || '').split(',')[0];
+        return { pos: [parseFloat(d.lat), parseFloat(d.lon)], name, area };
+      });
+    } catch (e) { return []; }
+  }
+  async function searchGsi(query) {
+    try {
+      const res = await fetch(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(query)}`);
+      if (!res.ok) return [];
+      return (await res.json()).slice(0, 10).map((d) => {
+        const title = d.properties.title || '';
+        const isAddr = /^(北海道|東京都|京都府|大阪府|.{2,3}県)/.test(title);
+        return { pos: [d.geometry.coordinates[1], d.geometry.coordinates[0]], name: title, area: isAddr ? title : '', gsiPlace: !isAddr };
+      });
+    } catch (e) { return []; }
+  }
+
   async function geocode(query) {
     const isStation = /駅$/.test(query.trim());
     // 駅名（「〇〇駅」）は駅データで探す
@@ -252,42 +315,44 @@
     // 0) Google（キーがあるとき）
     const g = await geocodeGoogle(query);
     if (g.length) return g;
-    // 1) OpenStreetMap（駅名・施設名に強い）
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=jp&accept-language=ja&limit=5&q=${encodeURIComponent(query)}`;
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.length) {
-          // 近すぎる候補（同じ駅の出口など）はまとめる
-          const uniq = [];
-          for (const d of data) {
-            const p = [parseFloat(d.lat), parseFloat(d.lon)];
-            if (!uniq.some((u) => distanceKm(u.pos, p) < 3)) {
-              uniq.push({ pos: p, label: shortName(d) });
-            }
-          }
-          return uniq;
-        }
-      }
-    } catch (e) { /* 次へ */ }
-    // 2) 国土地理院（住所に強い）
-    try {
-      const res = await fetch(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(query)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.length) return data.slice(0, 5).map((d) => ({ pos: [d.geometry.coordinates[1], d.geometry.coordinates[0]], label: d.properties.title }));
-      }
-    } catch (e) { /* 失敗 */ }
-    // 3) 「駅」を付けずに駅名だけ入れた場合
+
+    // 1) OpenStreetMap と 国土地理院 を同時に検索
+    const { area, name } = splitQuery(query);
+    const jobs = [searchNominatim(query), searchGsi(query)];
+    if (area.length && name && name !== query) jobs.push(searchGsi(name));
+    const [osm, gsi, gsiName = []] = await Promise.all(jobs);
+    let list = [...osm, ...gsi, ...gsiName];
+
+    // 地理院の施設名には住所が付かないので、近くの市区町村名を補う
+    await Promise.all(list.filter((c) => c.gsiPlace).slice(0, 8).map(async (c) => { c.area = await gsiArea(c.pos); }));
+
+    // 2) 入力した名前を含むものを優先（「鹿本小学校」で「松本小学校」などを出さない）
+    const key = norm(name);
+    const hit = list.filter((c) => key && norm(c.name).includes(key));
+    if (hit.length) list = hit;
+    // 3) 地域（「江戸川区」など）を入れていたら、その地域のものを優先
+    if (area.length) {
+      const inArea = list.filter((c) => area.every((t) => (c.area + c.name).includes(t.replace(/[\s　]/g, ''))));
+      if (inArea.length) list = inArea;
+    }
+    if (!hit.length) {
+      // 名前が合うものがなければ、従来どおり OpenStreetMap → 地理院 の順
+      list = osm.length ? osm : [...gsi, ...gsiName];
+    }
+
+    // 4) 近すぎる候補（同じ施設の重複）はまとめる
+    const uniq = [];
+    for (const c of list) {
+      if (uniq.some((u) => distanceKm(u.pos, c.pos) < 0.5)) continue;
+      const areaText = c.area && c.area !== c.name ? c.area : '';
+      uniq.push({ pos: c.pos, label: c.name, title: c.name, sub: areaText });
+      if (uniq.length >= 6) break;
+    }
+    if (uniq.length) return uniq;
+
+    // 5) 「駅」を付けずに駅名だけ入れた場合
     if (!isStation) return geocodeStation(query);
     return [];
-  }
-  function shortName(d) {
-    const a = d.address || {};
-    const area = [a.province || a.state, a.city || a.town || a.village || a.county, a.suburb || a.quarter].filter(Boolean);
-    const name = d.name || (d.display_name || '').split(',')[0];
-    return [name, area.length ? `（${area.join(' ')}）` : ''].join('');
   }
 
   async function runSearch(query) {
