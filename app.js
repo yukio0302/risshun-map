@@ -199,13 +199,44 @@
     } catch (e) { return []; }
   }
 
+  // 駅名検索（HeartRails Express：県名・路線名つき）
+  async function geocodeStation(query) {
+    const name = query.replace(/\s+/g, '').replace(/駅$/, '');
+    if (!name) return [];
+    try {
+      const res = await fetch(`https://express.heartrails.com/api/json?method=getStations&name=${encodeURIComponent(name)}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      const list = (data.response && data.response.station) || [];
+      const groups = [];
+      list.forEach((st) => {
+        const pos = [Number(st.y), Number(st.x)];
+        const g = groups.find((x) => x.name === st.name && x.pref === st.prefecture && distanceKm(x.pos, pos) < 1.5);
+        if (g) { if (!g.lines.includes(st.line)) g.lines.push(st.line); }
+        else groups.push({ name: st.name, pref: st.prefecture, pos, lines: [st.line] });
+      });
+      return groups.map((g) => ({
+        pos: g.pos,
+        label: `${g.name}駅`,
+        title: `${g.name}駅（${g.pref}）`,
+        sub: g.lines.join('・'),
+      }));
+    } catch (e) { return []; }
+  }
+
   async function geocode(query) {
+    const isStation = /駅$/.test(query.trim());
+    // 駅名（「〇〇駅」）は駅データで探す
+    if (isStation) {
+      const st = await geocodeStation(query);
+      if (st.length) return st;
+    }
     // 0) Google（キーがあるとき）
     const g = await geocodeGoogle(query);
     if (g.length) return g;
     // 1) OpenStreetMap（駅名・施設名に強い）
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=jp&accept-language=ja&limit=5&q=${encodeURIComponent(query)}`;
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=jp&accept-language=ja&limit=5&q=${encodeURIComponent(query)}`;
       const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
       if (res.ok) {
         const data = await res.json();
@@ -227,9 +258,11 @@
       const res = await fetch(`https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(query)}`);
       if (res.ok) {
         const data = await res.json();
-        return data.slice(0, 5).map((d) => ({ pos: [d.geometry.coordinates[1], d.geometry.coordinates[0]], label: d.properties.title }));
+        if (data.length) return data.slice(0, 5).map((d) => ({ pos: [d.geometry.coordinates[1], d.geometry.coordinates[0]], label: d.properties.title }));
       }
     } catch (e) { /* 失敗 */ }
+    // 3) 「駅」を付けずに駅名だけ入れた場合
+    if (!isStation) return geocodeStation(query);
     return [];
   }
   function shortName(d) {
@@ -255,8 +288,9 @@
     if (results.length > 1) {
       showMessage('');
       els.candidates.innerHTML = '<p>どちらの場所ですか？</p>' +
-        results.map((r, i) => `<button type="button" data-i="${i}">${esc(r.label)}</button>`).join('');
+        results.map((r, i) => `<button type="button" data-i="${i}"><span class="cand-title">${esc(r.title || r.label)}</span>${r.sub ? `<span class="cand-sub">${esc(r.sub)}</span>` : ''}</button>`).join('');
       els.candidates.hidden = false;
+      els.candidates.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       els.candidates.onclick = (e) => {
         const b = e.target.closest('button');
         if (!b) return;
@@ -267,7 +301,7 @@
       if (isMobile()) setSheet('open');
       return;
     }
-    setOrigin(results[0].pos, query);
+    setOrigin(results[0].pos, results[0].sub ? results[0].label : query);
   }
 
   function locate() {

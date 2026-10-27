@@ -64,6 +64,8 @@ a{color:inherit}
 .candidates p{margin:0;padding:8px 12px;font-size:12px;color:var(--muted);background:#fafafa}
 .candidates button{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:#fff;padding:10px 12px;font-size:13px}
 .candidates button:hover{background:var(--red-soft)}
+.cand-title{display:block;font-weight:700}
+.cand-sub{display:block;margin-top:2px;font-size:12px;color:var(--muted)}
 
 .message{margin:10px 0 0;font-size:13px;line-height:1.6;color:var(--red-dark);background:var(--red-soft);border-radius:8px;padding:8px 12px}
 .message.info{color:var(--ink);background:var(--cream)}
