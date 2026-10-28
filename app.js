@@ -574,7 +574,15 @@
     setSheet(order[els.panel.dataset.state] || 'half');
   });
   // タップした瞬間にパネルを開いておく（キーボードが出る前に検索窓を上へ）
-  els.q.addEventListener('pointerdown', () => { if (isMobile() && els.panel.dataset.state !== 'open') { els.panel.style.transition = 'none'; setSheet('open'); els.scroll.scrollTop = 0; requestAnimationFrame(() => { els.panel.style.transition = ''; }); } });
+  els.q.addEventListener('touchend', (e) => {
+    if (!isMobile() || els.panel.dataset.state === 'open' || document.activeElement === els.q) return;
+    e.preventDefault();
+    els.panel.style.transition = 'none';
+    setSheet('open');
+    els.scroll.scrollTop = 0;
+    els.q.focus();
+    requestAnimationFrame(() => { els.panel.style.transition = ''; });
+  }, { passive: false });
   els.q.addEventListener('focus', () => { if (isMobile()) setSheet('open'); [0, 100, 300, 600, 1000].forEach((t) => setTimeout(fitKeyboard, t)); });
   els.q.addEventListener('blur', () => setTimeout(fitKeyboard, 150));
   // スマホでキーボードが出たら、見えている範囲いっぱいにパネルを広げて検索窓を上に出す
