@@ -573,7 +573,24 @@
     const order = { peek: 'half', half: 'open', open: 'peek' };
     setSheet(order[els.panel.dataset.state] || 'half');
   });
-  els.q.addEventListener('focus', () => { if (isMobile()) setSheet('open'); });
+  els.q.addEventListener('focus', () => { if (isMobile()) setSheet('open'); setTimeout(fitKeyboard, 350); });
+  els.q.addEventListener('blur', () => setTimeout(fitKeyboard, 150));
+  // スマホでキーボードが出たら、見えている範囲いっぱいにパネルを広げて検索窓を上に出す
+  const vv = window.visualViewport;
+  let kbOpen = false;
+  function fitKeyboard() {
+    if (!vv) return;
+    const open = isMobile() && document.activeElement === els.q && window.innerHeight - vv.height > 120;
+    const root = document.documentElement;
+    root.style.setProperty('--vvh', vv.height + 'px');
+    root.style.setProperty('--vvtop', vv.offsetTop + 'px');
+    if (open !== kbOpen) {
+      kbOpen = open;
+      root.classList.toggle('kb', open);
+      if (open) { els.scroll.scrollTop = 0; window.scrollTo(0, 0); }
+    }
+  }
+  if (vv) { vv.addEventListener('resize', fitKeyboard); vv.addEventListener('scroll', fitKeyboard); }
 
   // ===== 起動 =====
   // 最初の表示：スマホはパネル半分、地図は日本全体が見える位置
