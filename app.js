@@ -573,7 +573,9 @@
     const order = { peek: 'half', half: 'open', open: 'peek' };
     setSheet(order[els.panel.dataset.state] || 'half');
   });
-  els.q.addEventListener('focus', () => { if (isMobile()) setSheet('open'); setTimeout(fitKeyboard, 350); });
+  // タップした瞬間にパネルを開いておく（キーボードが出る前に検索窓を上へ）
+  els.q.addEventListener('pointerdown', () => { if (isMobile() && els.panel.dataset.state !== 'open') { els.panel.style.transition = 'none'; setSheet('open'); els.scroll.scrollTop = 0; requestAnimationFrame(() => { els.panel.style.transition = ''; }); } });
+  els.q.addEventListener('focus', () => { if (isMobile()) setSheet('open'); [0, 100, 300, 600, 1000].forEach((t) => setTimeout(fitKeyboard, t)); });
   els.q.addEventListener('blur', () => setTimeout(fitKeyboard, 150));
   // スマホでキーボードが出たら、見えている範囲いっぱいにパネルを広げて検索窓を上に出す
   const vv = window.visualViewport;
@@ -587,8 +589,9 @@
     if (open !== kbOpen) {
       kbOpen = open;
       root.classList.toggle('kb', open);
-      if (open) { els.scroll.scrollTop = 0; window.scrollTo(0, 0); }
+      if (open) els.scroll.scrollTop = 0;
     }
+    if (open && (window.scrollY || vv.offsetTop)) window.scrollTo(0, 0);
   }
   if (vv) { vv.addEventListener('resize', fitKeyboard); vv.addEventListener('scroll', fitKeyboard); }
 
