@@ -156,5 +156,5 @@ a{color:inherit}
   html.kb .layout{top:var(--vvtop,0px);bottom:auto;height:var(--vvh,100%)}
   html.kb .panel{height:100%;border-radius:0;transition:none}
   html.kb .sheet-handle{display:none}
-  html.kb .fab{display:none}
+  html.kb .fab,html.kb .leaflet-control-container{display:none}
 }
