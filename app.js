@@ -162,6 +162,19 @@
     return res.json();
   }
   const routeUrl = (s) => `https://www.google.com/maps/dir/?api=1&destination=${s.la},${s.lo}`;
+  function overviewPopup(s) {
+    const tags = (s.b || []).map((x) => `<span class="tag">${esc(x)}</span>`).join('');
+    const box = document.createElement('div');
+    box.innerHTML = `<div class="popup-name">${esc(s.n)}</div>${s.a ? `<div class="popup-addr">${esc(s.a)}</div>` : ''}`
+      + (tags ? `<div class="tags popup-tags">${tags}</div>` : '')
+      + `<div class="popup-actions">${detailUrl(s) ? `<a class="btn-detail" href="${detailUrl(s)}" target="_blank" rel="noopener" data-track="click_detail">お店の詳細</a>` : ''}`
+      + `<a class="btn-route" href="${routeUrl(s)}" target="_blank" rel="noopener" data-track="click_route">道順を見る</a></div>`;
+    box.addEventListener('click', (e) => {
+      const a = e.target.closest('a[data-track]');
+      if (a) track(a.dataset.track, { store_name: s.n, store_id: s.u, via: 'overview' });
+    });
+    return box;
+  }
 
   function pinIcon(text, active) {
     const small = text.length > 2 ? ' small' : '';
@@ -612,7 +625,14 @@
   loadStores().then((data) => {
     stores = data;
     // 全国の店舗を薄い点で表示
-    data.forEach((s) => L.circleMarker([s.la, s.lo], { radius: 3.5, weight: 1, color: '#fff', fillColor: '#c8161d', fillOpacity: 0.75 }).addTo(allLayer));
+    // 全国の店舗を薄い点で表示（クリックでお店の情報）
+    const dotRenderer = L.canvas({ tolerance: 8 });
+    data.forEach((s) => {
+      L.circleMarker([s.la, s.lo], { renderer: dotRenderer, radius: 3.5, weight: 1, color: '#fff', fillColor: '#c8161d', fillOpacity: 0.75 })
+        .bindPopup(() => overviewPopup(s), { maxWidth: 280 })
+        .on('click', () => track('select_store', { store_name: s.n, store_id: s.u, via: 'overview' }))
+        .addTo(allLayer);
+    });
     if (!els.summary.dataset.set) els.summary.textContent = `全国${data.length}店から探す`;
     const q0 = new URLSearchParams(location.search).get('q');
     if (q0) runSearch(q0);

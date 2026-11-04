@@ -158,3 +158,10 @@ a{color:inherit}
   html.kb .sheet-handle{display:none}
   html.kb .fab,html.kb .leaflet-control-container{display:none}
 }
+
+/* 全国の点をクリックしたときの吹き出し */
+.popup-tags{margin:6px 0 2px}
+.popup-actions{display:flex;gap:8px;margin-top:8px}
+.leaflet-container .popup-actions a{font-size:12px;text-decoration:none;border-radius:6px;padding:6px 10px}
+.leaflet-container .popup-actions a.btn-detail{color:#fff}
+.leaflet-container .popup-actions a.btn-route{color:var(--ink)}
