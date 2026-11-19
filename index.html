@@ -14,7 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css">
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 <header class="topbar">
@@ -95,6 +95,11 @@
           <h2><span class="step-no">STEP 3</span><span id="step3Title">近くのお店</span></h2>
           <span id="resultMeta" class="result-meta"></span>
         </div>
+        <div id="sortBar" class="sort-bar" hidden>
+          <span>並び順：</span>
+          <button type="button" data-sort="kura" aria-pressed="true">蔵元から近い順</button>
+          <button type="button" data-sort="here" aria-pressed="false">現在地から近い順</button>
+        </div>
         <ol id="storeList" class="store-list"></ol>
       </section>
 
@@ -115,6 +120,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
 <script src="config.js?v=11"></script>
-<script src="app.js?v=19"></script>
+<script src="app.js?v=20"></script>
 </body>
 </html>

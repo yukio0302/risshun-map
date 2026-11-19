@@ -18,7 +18,7 @@
     list: $('storeList'), meta: $('resultMeta'),
     locateBtn: $('locateBtn'), locateFab: $('locateFab'),
     placeMode: $('placeMode'), brandMode: $('brandMode'), brandQ: $('brandQ'), brandAll: $('brandAll'),
-    step3Title: $('step3Title'),
+    step3Title: $('step3Title'), sortBar: $('sortBar'),
   };
   const isMobile = () => window.matchMedia('(max-width: 820px)').matches;
 
@@ -54,6 +54,8 @@
   const allLayer = L.layerGroup().addTo(map);   // 全国の店舗（小さい点）
   const resultLayer = L.layerGroup().addTo(map);
   let hereMarker = null;
+  let kura = {};   // 銘柄 → 蔵元の場所（kura.json）
+  const kuraReady = fetch('kura.json?v=1').then((r) => r.json()).then((j) => { kura = j || {}; }).catch(() => {});
 
   // ===== 状態 =====
   let stores = [];
@@ -414,11 +416,27 @@
   }
 
   // ===== 検索結果 =====
+  // 検索地点・蔵元の目印（お店のピンより必ず手前に表示）
+  function putMark(pos, text, kind) {
+    if (hereMarker) hereMarker.remove();
+    hereMarker = L.marker(pos, {
+      pane: 'originPane',
+      interactive: false,
+      keyboard: false,
+      icon: L.divIcon({
+        className: '',
+        html: `<div class="origin-mark ${kind === 'kura' ? 'kura' : ''}"><span class="origin-pulse"></span><span class="origin-dot"></span><span class="origin-label">${esc(text)}</span></div>`,
+        iconSize: [0, 0], iconAnchor: [0, 0],
+      }),
+    }).addTo(map);
+  }
   function setOrigin(pos, labelText) {
     state.origin = pos;
     state.originLabel = labelText;
     state.brand = 'すべて';
     state.mode = 'place';
+    state.distLabel = labelText;
+    els.sortBar.hidden = true;
     els.step3Title.textContent = '近くのお店';
 
     const withDist = stores.map((s) => ({ ...s, d: distanceKm(pos, [s.la, s.lo]) })).sort((a, b) => a.d - b.d);
@@ -448,18 +466,7 @@
     if (labelText === '現在地') params.delete('q'); else params.set('q', els.q.value || labelText);
     history.replaceState(null, '', `${location.pathname}${params.toString() ? '?' + params : ''}`);
 
-    if (hereMarker) hereMarker.remove();
-    // 検索地点：お店のピンより必ず手前に表示
-    hereMarker = L.marker(pos, {
-      pane: 'originPane',
-      interactive: false,
-      keyboard: false,
-      icon: L.divIcon({
-        className: '',
-        html: `<div class="origin-mark"><span class="origin-pulse"></span><span class="origin-dot"></span><span class="origin-label">${esc(labelText)}</span></div>`,
-        iconSize: [0, 0], iconAnchor: [0, 0],
-      }),
-    }).addTo(map);
+    putMark(pos, labelText, 'here');
 
     els.intro.hidden = true;
     els.examples.hidden = true;
@@ -493,7 +500,7 @@
       const lb = label(i);
       s._label = lb;
       const m = L.marker([s.la, s.lo], { icon: pinIcon(lb, false), zIndexOffset: 1000 - i, riseOnHover: true })
-        .bindPopup(`<div class="popup-name">${esc(s.n)}</div>${s.a ? `<div class="popup-addr">${esc(s.a)}</div>` : ''}${byBrand ? '' : `<div class="popup-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>`}${detailUrl(s) ? `<a class="popup-link" href="${detailUrl(s)}" target="_blank" rel="noopener">お店の詳細を見る →</a>` : ''}`)
+        .bindPopup(`<div class="popup-name">${esc(s.n)}</div>${s.a ? `<div class="popup-addr">${esc(s.a)}</div>` : ''}${state.distLabel ? `<div class="popup-dist">${esc(state.distLabel)}から ${fmtDist(s.d)}</div>` : ''}${detailUrl(s) ? `<a class="popup-link" href="${detailUrl(s)}" target="_blank" rel="noopener">お店の詳細を見る →</a>` : ''}`)
         .on('click', () => { activate(s.u, { from: 'map' }); track('select_store', { store_name: s.n, store_id: s.u, via: 'map' }); })
         .addTo(resultLayer);
       markers.set(s.u, m);
@@ -505,7 +512,7 @@
         <div class="store-body">
           <p class="store-name">${esc(s.n)}</p>
           ${s.a ? `<div class="store-addr">${esc(s.a)}</div>` : ''}
-          ${byBrand ? '' : `<div class="store-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>`}
+          ${state.distLabel ? `<div class="store-dist">${esc(state.distLabel)}から ${fmtDist(s.d)}</div>` : ''}
           <div class="tags">${s.b.map((b) => `<span class="tag">${esc(b)}</span>`).join('')}</div>
           <div class="store-actions">
             ${detailUrl(s) ? `<a class="btn-detail" href="${detailUrl(s)}" target="_blank" rel="noopener" data-track="click_detail">お店の詳細</a>` : ''}
@@ -516,12 +523,12 @@
 
     const total = filtered().length;
     const brandText = state.brand === 'すべて' ? '' : `「${state.brand}」`;
-    els.meta.textContent = byBrand ? `${total}件（北から順）` : `${total}件${total > MAX_RESULTS ? `（近い順に${MAX_RESULTS}件表示）` : ''}`;
+    els.meta.textContent = byBrand ? `${total}件（${state.sortText}）` : `${total}件${total > MAX_RESULTS ? `（近い順に${MAX_RESULTS}件表示）` : ''}`;
     els.summary.textContent = `${brandText}${total}件のお店が見つかりました`;
     els.step3.hidden = false;
 
     if (fit) {
-      const pts = byBrand ? list.map((s) => [s.la, s.lo]) : list.slice(0, 15).map((s) => [s.la, s.lo]).concat([state.origin]);
+      const pts = state.origin ? list.slice(0, 15).map((s) => [s.la, s.lo]).concat([state.origin]) : list.map((s) => [s.la, s.lo]);
       const pad = isMobile() ? { paddingTopLeft: [30, 30], paddingBottomRight: [30, window.innerHeight * 0.48] }
                              : { paddingTopLeft: [460, 40], paddingBottomRight: [40, 40] };
       map.fitBounds(L.latLngBounds(pts), { ...pad, maxZoom: 15 });
@@ -581,18 +588,15 @@
   function showBrand(brand) {
     state.mode = 'brand';
     state.brand = brand;
-    state.origin = null;
     state.originLabel = '';
-    state.nearby = stores.filter((s) => s.b.includes(brand))
-      .map((s) => ({ ...s, d: 0 }))
-      .sort((a, b) => prefIndex(a.a) - prefIndex(b.a) || b.la - a.la);
-    if (hereMarker) { hereMarker.remove(); hereMarker = null; }
+    state.nearby = stores.filter((s) => s.b.includes(brand)).map((s) => ({ ...s, d: 0 }));
     els.q.value = '';
     showMessage('');
     els.step2.hidden = true;
     els.step3Title.textContent = `「${brand}」を扱うお店`;
     renderBrandAll();
-    renderResults(true);
+    els.sortBar.hidden = false;
+    sortBrand(kura[brand] ? 'kura' : 'north');
     els.summary.textContent = `「${brand}」を扱うお店 ${state.nearby.length}件`;
     const params = new URLSearchParams();
     params.set('brand', brand);
@@ -602,6 +606,46 @@
     if (isMobile()) setSheet('half');
     els.step3.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
+  // 並び順：蔵元から近い順（初期）／現在地から近い順
+  function sortBrand(kind, pos) {
+    const k = kura[state.brand];
+    if (kind === 'here' && pos) {
+      state.origin = pos; state.distLabel = '現在地'; state.sortText = '現在地から近い順';
+      putMark(pos, '現在地', 'here');
+    } else if (k) {
+      kind = 'kura';
+      state.origin = [k.la, k.lo]; state.distLabel = `蔵元のある${k.area.replace(/^(北海道|東京都|京都府|大阪府|.{2,3}県)/, '')}`; state.sortText = '蔵元から近い順';
+      putMark(state.origin, `蔵元：${k.kura}（${k.area}）`, 'kura');
+    } else {
+      kind = 'north';
+      state.origin = null; state.distLabel = ''; state.sortText = '北から順';
+      if (hereMarker) { hereMarker.remove(); hereMarker = null; }
+    }
+    if (state.origin) {
+      state.nearby.forEach((s) => { s.d = distanceKm(state.origin, [s.la, s.lo]); });
+      state.nearby.sort((a, b) => a.d - b.d);
+    } else {
+      state.nearby.sort((a, b) => prefIndex(a.a) - prefIndex(b.a) || b.la - a.la);
+    }
+    els.sortBar.querySelectorAll('button').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.sort === kind));
+      if (b.dataset.sort === 'kura') { b.hidden = !k; b.textContent = '蔵元から近い順'; }
+    });
+    renderResults(true);
+  }
+  els.sortBar.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-sort]');
+    if (!b || state.mode !== 'brand') return;
+    if (b.dataset.sort === 'kura') { sortBrand('kura'); track('sort_brand', { brand: state.brand, sort: 'kura' }); return; }
+    if (!navigator.geolocation) { els.meta.textContent = '現在地を取得できません'; return; }
+    const label0 = b.textContent;
+    b.textContent = '取得中…';
+    navigator.geolocation.getCurrentPosition(
+      (p) => { b.textContent = label0; sortBrand('here', [p.coords.latitude, p.coords.longitude]); track('sort_brand', { brand: state.brand, sort: 'here' }); },
+      () => { b.textContent = label0; els.meta.textContent = '現在地を取得できませんでした（位置情報の設定をご確認ください）'; },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  });
   document.querySelector('.mode-tabs').addEventListener('click', (e) => {
     const t = e.target.closest('.mode-tab');
     if (t) setMode(t.dataset.mode);
@@ -697,6 +741,6 @@
     const q0 = new URLSearchParams(location.search).get('q');
     const b0 = new URLSearchParams(location.search).get('brand');
     if (q0) runSearch(q0);
-    else if (b0 && stores.some((s) => s.b.includes(b0))) { setMode('brand'); showBrand(b0); }
+    else if (b0 && stores.some((s) => s.b.includes(b0))) { setMode('brand'); kuraReady.then(() => showBrand(b0)); }
   });
 })();

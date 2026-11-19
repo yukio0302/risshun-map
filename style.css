@@ -174,3 +174,12 @@ a{color:inherit}
 .brand-hint{margin:10px 0 8px;font-size:12px;color:var(--muted)}
 .brand-all{max-height:260px;overflow-y:auto}
 .brand-none{margin:0;font-size:13px;color:var(--muted)}
+
+/* 銘柄の並び順ボタン・蔵元の目印 */
+.sort-bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:-4px 0 10px;font-size:12px;color:var(--muted)}
+.sort-bar button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 10px;font-size:12px;color:var(--ink)}
+.sort-bar button[aria-pressed="true"]{background:var(--red);border-color:var(--red);color:#fff}
+.origin-mark.kura .origin-dot{background:#7a4a12}
+.origin-mark.kura .origin-pulse{background:rgba(122,74,18,.28)}
+.origin-mark.kura .origin-label{background:#7a4a12}
+.origin-mark.kura .origin-label::after{border-top-color:#7a4a12}
