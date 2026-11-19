@@ -165,3 +165,12 @@ a{color:inherit}
 .leaflet-container .popup-actions a{font-size:12px;text-decoration:none;border-radius:6px;padding:6px 10px}
 .leaflet-container .popup-actions a.btn-detail{color:#fff}
 .leaflet-container .popup-actions a.btn-route{color:var(--ink)}
+
+/* 探し方の切り替え（場所／銘柄） */
+.mode-tabs{display:flex;background:#f3f3f3;border-radius:999px;padding:3px;margin-bottom:12px}
+.mode-tab{flex:1;border:0;background:transparent;border-radius:999px;padding:8px 0;font-size:14px;font-weight:700;color:var(--muted)}
+.mode-tab[aria-selected="true"]{background:#fff;color:var(--red);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.brand-search{padding:4px 16px}
+.brand-hint{margin:10px 0 8px;font-size:12px;color:var(--muted)}
+.brand-all{max-height:260px;overflow-y:auto}
+.brand-none{margin:0;font-size:13px;color:var(--muted)}

@@ -17,6 +17,8 @@
     step2: $('step2'), chips: $('brandChips'), step3: $('step3'),
     list: $('storeList'), meta: $('resultMeta'),
     locateBtn: $('locateBtn'), locateFab: $('locateFab'),
+    placeMode: $('placeMode'), brandMode: $('brandMode'), brandQ: $('brandQ'), brandAll: $('brandAll'),
+    step3Title: $('step3Title'),
   };
   const isMobile = () => window.matchMedia('(max-width: 820px)').matches;
 
@@ -416,6 +418,8 @@
     state.origin = pos;
     state.originLabel = labelText;
     state.brand = 'すべて';
+    state.mode = 'place';
+    els.step3Title.textContent = '近くのお店';
 
     const withDist = stores.map((s) => ({ ...s, d: distanceKm(pos, [s.la, s.lo]) })).sort((a, b) => a.d - b.d);
     let nearby = withDist.filter((s) => s.d <= RADIUS_KM);
@@ -440,6 +444,7 @@
 
     // URL に反映（共有・再読み込み用）
     const params = new URLSearchParams(location.search);
+    params.delete('brand');
     if (labelText === '現在地') params.delete('q'); else params.set('q', els.q.value || labelText);
     history.replaceState(null, '', `${location.pathname}${params.toString() ? '?' + params : ''}`);
 
@@ -478,7 +483,8 @@
   }
 
   function renderResults(fit) {
-    const list = filtered().slice(0, MAX_RESULTS);
+    const byBrand = state.mode === 'brand';
+    const list = byBrand ? filtered() : filtered().slice(0, MAX_RESULTS);
     resultLayer.clearLayers();
     markers.clear();
     state.activeId = null;
@@ -487,7 +493,7 @@
       const lb = label(i);
       s._label = lb;
       const m = L.marker([s.la, s.lo], { icon: pinIcon(lb, false), zIndexOffset: 1000 - i, riseOnHover: true })
-        .bindPopup(`<div class="popup-name">${esc(s.n)}</div>${s.a ? `<div class="popup-addr">${esc(s.a)}</div>` : ''}<div class="popup-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>${detailUrl(s) ? `<a class="popup-link" href="${detailUrl(s)}" target="_blank" rel="noopener">お店の詳細を見る →</a>` : ''}`)
+        .bindPopup(`<div class="popup-name">${esc(s.n)}</div>${s.a ? `<div class="popup-addr">${esc(s.a)}</div>` : ''}${byBrand ? '' : `<div class="popup-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>`}${detailUrl(s) ? `<a class="popup-link" href="${detailUrl(s)}" target="_blank" rel="noopener">お店の詳細を見る →</a>` : ''}`)
         .on('click', () => { activate(s.u, { from: 'map' }); track('select_store', { store_name: s.n, store_id: s.u, via: 'map' }); })
         .addTo(resultLayer);
       markers.set(s.u, m);
@@ -499,7 +505,7 @@
         <div class="store-body">
           <p class="store-name">${esc(s.n)}</p>
           ${s.a ? `<div class="store-addr">${esc(s.a)}</div>` : ''}
-          <div class="store-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>
+          ${byBrand ? '' : `<div class="store-dist">${esc(state.originLabel)}から ${fmtDist(s.d)}</div>`}
           <div class="tags">${s.b.map((b) => `<span class="tag">${esc(b)}</span>`).join('')}</div>
           <div class="store-actions">
             ${detailUrl(s) ? `<a class="btn-detail" href="${detailUrl(s)}" target="_blank" rel="noopener" data-track="click_detail">お店の詳細</a>` : ''}
@@ -510,12 +516,12 @@
 
     const total = filtered().length;
     const brandText = state.brand === 'すべて' ? '' : `「${state.brand}」`;
-    els.meta.textContent = `${total}件${total > MAX_RESULTS ? `（近い順に${MAX_RESULTS}件表示）` : ''}`;
+    els.meta.textContent = byBrand ? `${total}件（北から順）` : `${total}件${total > MAX_RESULTS ? `（近い順に${MAX_RESULTS}件表示）` : ''}`;
     els.summary.textContent = `${brandText}${total}件のお店が見つかりました`;
     els.step3.hidden = false;
 
     if (fit) {
-      const pts = list.slice(0, 15).map((s) => [s.la, s.lo]).concat([state.origin]);
+      const pts = byBrand ? list.map((s) => [s.la, s.lo]) : list.slice(0, 15).map((s) => [s.la, s.lo]).concat([state.origin]);
       const pad = isMobile() ? { paddingTopLeft: [30, 30], paddingBottomRight: [30, window.innerHeight * 0.48] }
                              : { paddingTopLeft: [460, 40], paddingBottomRight: [40, 40] };
       map.fitBounds(L.latLngBounds(pts), { ...pad, maxZoom: 15 });
@@ -552,6 +558,60 @@
       setTimeout(() => m.openPopup(), 550);
     }
   }
+
+  // ===== 銘柄から探す =====
+  const prefIndex = (a) => { const i = PREFS.findIndex((p) => String(a || '').startsWith(p)); return i < 0 ? 99 : i; };
+  function setMode(mode) {
+    document.querySelectorAll('.mode-tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.mode === mode)));
+    els.placeMode.hidden = mode !== 'place';
+    els.locateBtn.hidden = mode !== 'place';
+    els.brandMode.hidden = mode !== 'brand';
+    els.candidates.hidden = true;
+    showMessage('');
+  }
+  function renderBrandAll() {
+    const counts = new Map();
+    stores.forEach((s) => s.b.forEach((b) => counts.set(b, (counts.get(b) || 0) + 1)));
+    const key = (els.brandQ.value || '').trim();
+    const items = [...counts].sort((a, b) => b[1] - a[1]).filter(([b]) => !key || b.includes(key));
+    els.brandAll.innerHTML = items.length
+      ? items.map(([b, n]) => `<button type="button" data-b="${esc(b)}" aria-pressed="${state.mode === 'brand' && state.brand === b}">${esc(b)}<span class="n">${n}</span></button>`).join('')
+      : '<p class="brand-none">該当する銘柄がありません</p>';
+  }
+  function showBrand(brand) {
+    state.mode = 'brand';
+    state.brand = brand;
+    state.origin = null;
+    state.originLabel = '';
+    state.nearby = stores.filter((s) => s.b.includes(brand))
+      .map((s) => ({ ...s, d: 0 }))
+      .sort((a, b) => prefIndex(a.a) - prefIndex(b.a) || b.la - a.la);
+    if (hereMarker) { hereMarker.remove(); hereMarker = null; }
+    els.q.value = '';
+    showMessage('');
+    els.step2.hidden = true;
+    els.step3Title.textContent = `「${brand}」を扱うお店`;
+    renderBrandAll();
+    renderResults(true);
+    els.summary.textContent = `「${brand}」を扱うお店 ${state.nearby.length}件`;
+    const params = new URLSearchParams();
+    params.set('brand', brand);
+    history.replaceState(null, '', `${location.pathname}?${params}`);
+    track('search_brand', { brand });
+    track('filter_brand', { brand, via: 'brand_search' });
+    if (isMobile()) setSheet('half');
+    els.step3.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+  document.querySelector('.mode-tabs').addEventListener('click', (e) => {
+    const t = e.target.closest('.mode-tab');
+    if (t) setMode(t.dataset.mode);
+  });
+  els.brandQ.addEventListener('input', renderBrandAll);
+  els.brandQ.addEventListener('focus', () => { if (isMobile()) setSheet('open'); });
+  els.brandAll.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-b]');
+    if (b) { els.brandQ.blur(); showBrand(b.dataset.b); }
+  });
 
   // ===== イベント =====
   els.form.addEventListener('submit', (e) => { e.preventDefault(); runSearch(els.q.value); });
@@ -633,8 +693,10 @@
         .on('click', () => track('select_store', { store_name: s.n, store_id: s.u, via: 'overview' }))
         .addTo(allLayer);
     });
-    if (!els.summary.dataset.set) els.summary.textContent = `全国${data.length}店から探す`;
+    renderBrandAll();
     const q0 = new URLSearchParams(location.search).get('q');
+    const b0 = new URLSearchParams(location.search).get('brand');
     if (q0) runSearch(q0);
+    else if (b0 && stores.some((s) => s.b.includes(b0))) { setMode('brand'); showBrand(b0); }
   });
 })();
